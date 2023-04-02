@@ -1,3 +1,3 @@
-# Simple Starter
+# Meeplon
 
-Simple JS build starter for simple, client-only demos.
+WIP
