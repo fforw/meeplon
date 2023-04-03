@@ -1,5 +1,7 @@
 import World from "./World"
 
+export const SCALE = 10
+export const TAU = 2 * Math.PI
 
 export class Env
 {

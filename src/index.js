@@ -1,28 +1,35 @@
 import "./style.css"
 import HexagonPatch from "./HexagonPatch"
-import env from "./env"
+import env, { SCALE } from "./env"
 import perfNow from "performance-now"
 
 import {
-    BufferGeometry,
-    DirectionalLight, DoubleSide,
-    Float32BufferAttribute, Mesh, MeshStandardMaterial,
+    AmbientLight,
+    BoxGeometry, ConeBufferGeometry,
+    DirectionalLight,
+    DirectionalLightHelper,
+    Mesh,
+    MeshStandardMaterial,
+    PCFSoftShadowMap,
     PerspectiveCamera,
-    Scene,
+    Scene, Vector3,
     WebGLRenderer
 } from "three"
+
 
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js"
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js"
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js"
 import World from "./World"
-
+import { Terrain } from "./terrain"
+import loadModel from "./loadModel"
 
 const TAU = Math.PI * 2
 
 let camera, scene, renderer
 
-let mouseX = 0, mouseY = 0;
+let mouseX = 0, mouseY = 0, mouseFirst = true;
+let mouseDeltaX = 0, mouseDeltaY = 0;
 
 let windowHalfX = window.innerWidth / 2;
 let windowHalfY = window.innerHeight / 2;
@@ -32,231 +39,93 @@ let height = window.innerHeight;
 
 const postprocessing = {};
 
+const cameraRadius = 50
 
-function calculateNormal(x0, y0)
+let cameraHeight = 1
+let cameraAngle = 0
+
+const adjustedZero = new Vector3(0,0,0)
+
+function init()
 {
-    const e = 0.1
+    //const seed = 1412
+    const seed = (Math.random() * 4294967296) & 0xffffffff
+    const world = new World(seed)
+    env.init(world)
 
-    const x1 = x0 + e
-    const y1 = y0
+    adjustedZero.setY(world.calculateHeight(0,0) + 5)
 
-    const x2 = x0
-    const y2 = y0 + e
+    const container = document.getElementById("root")
 
-    const z0 = Terrain.calculateHeight(x0,y0)
-    const z1 = Terrain.calculateHeight(x1,y1)
-    const z2 = Terrain.calculateHeight(x2,y2)
-
-    const ax = x1 - x0
-    const ay = y1 - y0
-    const az = z1 - z0
-    const bx = x2 - x0
-    const by = y2 - y0
-    const bz = z2 - z0
-
-
-    const nx = ay * bz - az * by
-    const ny = az * bx - ax * bz
-    const nz = ax * by - ay * bx
-
-    const f = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
-    return [
-        nx * f,
-        ny * f,
-        nz * f
-    ]
-}
-
-
-class Terrain
-{
-    /**
-     * @type {Scene}
-     */
-    scene = null
-
-    /**
-     *
-     * @type {HexagonPatch}
-     */
-    patch = null
-
-    world = null
-
-    /**
-     *
-     * @type {Array.<Face>}
-     */
-    faces = null
-
-    constructor(scene, world, patch)
-    {
-        this.scene = scene
-        this.world = world
-        this.patch = patch
-        this.faces = this.patch.build()
-    }
-
-    static calculateHeight(x,y)
-    {
-        const noise = env.world.noise;
-
-        const ns0 = 0.0015
-        const ns1= ns0 * 2
-        const ns2= ns1 * 2
-
-        const height = 100
-
-        const h = ((
-                noise.noise2D(x * ns0, y * ns0) +
-                noise.noise2D(x * ns1, y * ns1) * 0.5 +
-                noise.noise2D(x * ns2, y * ns2) * 0.25
-            ) / 1.75) * height
-
-        return h > -0.5 ? h : 0
-    }
-
-    createGeometry()
-    {
-        const patchX = 0
-        const patchY = 0
-
-        const geometry = new BufferGeometry()
-
-        const indices = []
-
-        const vertices = []
-        const normals = []
-        const colors = []
-
-        const faces = this.faces
-        for (let i = 0; i < faces.length; i++)
-        {
-            const face = faces[i]
-
-            let isFlat = false
-
-            const vOff = vertices.length/3
-            const tri = (x,y,z) => indices.push(vOff + x, vOff + y, vOff + z)
-
-            const first = face.halfEdge
-            let curr = first
-
-            let cx = 0
-            let cy = 0
-            do
-            {
-                const next = curr.next
-
-                const x0 = 0 | (patchX + curr.vertex.x)
-                const y0 = 0 | (patchY + curr.vertex.y)
-                const x1 = 0 | (patchX + next.vertex.x)
-                const y1 = 0 | (patchY + next.vertex.y)
-
-                const mx = (x0 + x1) / 2
-                const my = (y0 + y1) / 2
-
-                const z0 = Terrain.calculateHeight(x0,y0)
-                vertices.push(
-                    x0,y0,z0,
-                    mx,my,Terrain.calculateHeight(mx,my)
-                )
-
-                normals.push(
-                    ... calculateNormal(x0,y0),
-                    ... calculateNormal(mx,my)
-                )
-
-                colors.push(0,128,0)
-                colors.push(0,128,0)
-
-                cx += mx
-                cy += my
-
-                curr = next
-            } while (curr !== first)
-
-            cx >>= 2
-            cy >>= 2
-
-
-            vertices.push(
-                cx,cy,Terrain.calculateHeight(cx,cy),
-            )
-
-            normals.push(
-                ... calculateNormal(cx,cy)
-            )
-
-            colors.push(0,128,0)
-
-            tri(0,1,7)
-            tri(7,1,8)
-
-            tri(1,2,3)
-            tri(3,8,1)
-
-            tri(5,8,3)
-            tri(3,4,5)
-
-            tri(5,6,7)
-            tri(7,8,5)
-        }
-
-
-        geometry.setIndex(indices)
-        geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3))
-        geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3))
-        geometry.setAttribute("color", new Float32BufferAttribute(colors, 3))
-
-        return geometry
-    }
-
-}
-
-
-
-function init() {
-
-    const container = document.createElement( 'div' );
-    document.body.appendChild( container );
-
-    camera = new PerspectiveCamera( 70, width / height, 1, 3000 );
-    camera.position.z = 400;
+    camera = new PerspectiveCamera( 50, width / height, 1, 30000 );
 
     scene = new Scene();
 
     renderer = new WebGLRenderer();
+    // renderer.shadowMap.enabled = true;
+    // renderer.shadowMap.type = PCFSoftShadowMap; // default THREE.PCFShadowMap
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( width, height );
     container.appendChild( renderer.domElement );
 
-    const directionalLight = new DirectionalLight( 0xffffff, 1 );
+    const ambientLight = new AmbientLight("#4572ff", 0.4)
+    scene.add(ambientLight)
 
-    directionalLight.position.set(0,5,10)
-    directionalLight.target.position.set(0,0,0)
+    const directionalLight = new DirectionalLight( 0xffffff, 1 );
+    // directionalLight.castShadow = true
+    //Set up shadow properties for the light
+    // directionalLight.shadow.mapSize.width = 512; // default
+    // directionalLight.shadow.mapSize.height = 512; // default
+    // directionalLight.shadow.camera.near = 0.5; // default
+    // directionalLight.shadow.camera.far = 500; // default
+
+    directionalLight.position.set(0,adjustedZero.y + 20,10);
+    directionalLight.target.position.copy(adjustedZero)
     directionalLight.target.updateWorldMatrix()
 
     scene.add( directionalLight );
+    const helper = new DirectionalLightHelper( directionalLight, 2 );
+    helper.position.copy(adjustedZero)
+    scene.add( helper );
 
-    ///////////////////////////////////////////////
-
-    const patch = new HexagonPatch(0, 0, 32)
-
-    const world = new World()
-    env.init(world)
-
+    const patch = new HexagonPatch(0, 0, 30)
     const terrain = new Terrain(scene, world, patch)
 
-    const geometry = terrain.createGeometry();
+    terrain.createGeometries().forEach(
+        (geom) => {
+            console.log("GEOM.TERRAIN", geom.terrain)
+
+            const material = new MeshStandardMaterial({
+                roughness: 0.9,
+                ... geom.terrain.material,
+                //wireframe: true,
+                //vertexColors: true
+            })
+
+            const mesh = new Mesh(geom.createThreeGeometry(), material)
+            // mesh.castShadow = true
+            // mesh.receiveShadow = true
+            scene.add(mesh)
+        }
+    )
 
     const material = new MeshStandardMaterial({
-        roughness: 0.8,
-        vertexColors: true
+        roughness: 0.9,
+        color: "#c55"
     })
 
-    const mesh = new Mesh(geometry, material)
-    scene.add(mesh)
+    const cubeGeo = new ConeBufferGeometry(5,10)
+    const cube = new Mesh(cubeGeo, material)
+    // cube.castShadow = true
+    // cube.receiveShadow = true
+    cube.position.copy(adjustedZero)
+    scene.add(cube)
+    //
+    // tiles.forEach( t => {
+    //
+    //     t.position.setY(10)
+    //     scene.add(t)
+    // })
 
     ///////////////////////////////////////////////
 
@@ -270,18 +139,27 @@ function init() {
     window.addEventListener( 'resize', onWindowResize );
 
     postprocessing.bokeh.uniforms[ 'focus' ].value = 100;
-    postprocessing.bokeh.uniforms[ 'aperture' ].value = 0.025;
+    postprocessing.bokeh.uniforms[ 'aperture' ].value = 0.000025;
     //postprocessing.bokeh.uniforms[ 'maxblur' ].value = 0.015;
-    postprocessing.bokeh.uniforms[ 'maxblur' ].value = 0.015;
+    postprocessing.bokeh.uniforms[ 'maxblur' ].value = 0.005;
 }
 
 function onPointerMove( event ) {
 
     if ( event.isPrimary === false ) return;
 
+    const prevX = mouseX
+    const prevY = mouseY
+
     mouseX = event.clientX - windowHalfX;
     mouseY = event.clientY - windowHalfY;
 
+    if (!mouseFirst && !event.shiftKey)
+    {
+        mouseDeltaX += (mouseX - prevX)
+        mouseDeltaY += (mouseY - prevY)
+    }
+    mouseFirst = false
 }
 
 function onWindowResize() {
@@ -330,16 +208,47 @@ function render() {
 
     const time = perfNow() * 0.005;
 
-    camera.position.x = ( mouseX - camera.position.x ) * 0.144;
-    camera.position.y = ( - ( mouseY ) - camera.position.y ) * 0.144;
+    const sensitivity = 0.00036
+    const sensitivityY = 0.05
+    cameraAngle += mouseDeltaX * sensitivity
 
-    camera.lookAt( scene.position );
+    const cameraX = Math.cos(cameraAngle) * cameraRadius
+    const cameraZ = Math.sin(cameraAngle) * cameraRadius
 
-    //postprocessing.bokeh.uniforms.maxblur.value = Math.sin(time) * 0.03
+    const camBase = env.world.calculateHeight(cameraX, cameraZ);
+
+    const minY = camBase + 10
+    const maxY = camBase + 250
+
+    cameraHeight -= mouseDeltaY * sensitivityY
+    cameraHeight = cameraHeight < minY ? minY : cameraHeight > maxY ? maxY : cameraHeight
+
+    camera.position.set(cameraX, cameraHeight, cameraZ)
+
+    camera.lookAt( adjustedZero );
+
+    postprocessing.bokeh.uniforms.focus.value = camera.position.clone().sub(adjustedZero).length()
     postprocessing.composer.render( 0.01 );
+
+    mouseDeltaX = Math.floor(mouseDeltaX * 90) / 100
+    mouseDeltaY = Math.floor(mouseDeltaY * 90) / 100
 
 }
 
-init();
-animate();
+let tiles = {}
+
+loadModel("media/marching-squares.glb").then(
+    gltf => {
+
+        gltf.scene.children.forEach( k => {
+            tiles[k.name] = k
+        })
+
+        console.log("TILES", tiles)
+
+        init();
+        animate();
+    }
+)
+
 

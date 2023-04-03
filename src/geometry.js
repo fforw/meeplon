@@ -25,6 +25,8 @@ export class Vertex
      */
     halfEdge = null;
 
+    id = 0
+
     constructor(x, y, z, halfEdge)
     {
         this.x = x;
@@ -72,8 +74,6 @@ let faceCounter = 0;
 
 export class Face
 {
-    stroked = 1
-
     /**
      * First half edge of the face interior, part of a closed loop back to the fist edge.
      *
@@ -81,11 +81,24 @@ export class Face
      */
     halfEdge = null;
 
+
+    //// TERRAIN DATA //////////////////////////////////////////////////////////////////////////////////////////////////
+
     /**
-     * Color for this face
-     * @type {Color}
+     * Terrain index for this face.
+     * 
+     * @type {Number}
      */
-    color = null
+    terrain = -1
+
+    /**
+     * Center point of this face which is the x/z centroid at height map height
+     *
+     * @type {Array.<Number>}
+     */
+    center = null
+
+    biome = -1
     
     constructor(halfEdge)
     {
@@ -173,6 +186,8 @@ export class HalfEdge
      * @type {Face}
      */
     face = null;
+
+
 
     constructor(next, vertex, edge, face)
     {

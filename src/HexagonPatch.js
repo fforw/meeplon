@@ -1,4 +1,5 @@
 import { Edge, Face, HalfEdge, Vertex } from "./geometry";
+import env from "./env";
 
 function findInsideEdges(faces)
 {
@@ -55,7 +56,7 @@ function getEdges(faces)
 function shuffle(a) {
     let j, x, i;
     for (i = a.length - 1; i > 0; i--) {
-        j = Math.floor(Math.random() * (i + 1));
+        j = Math.floor(env.world.rnd.next(0, (i + 1)));
         x = a[i];
         a[i] = a[j];
         a[j] = x;
@@ -757,7 +758,7 @@ function key(q, r)
 }
 
 
-export const PATCH_SIZE = 12;
+export const PATCH_SIZE = 36;
 const hSize = PATCH_SIZE/2;
 
 export default class HexagonPatch
@@ -774,6 +775,8 @@ export default class HexagonPatch
         this.q = q
         this.r = r
         this.size = size
+
+
     }
 
 
@@ -823,7 +826,7 @@ export default class HexagonPatch
         const edges = [...findInsideEdges(faces)]
         shuffle(edges)
 
-        const count = 0 | (edges.length * (0.8 + Math.random() * 0.15 ))
+        const count = 0 | (edges.length * (0.8 + env.world.rnd.next() * 0.15 ))
 
         for (let i = 0; i < count; i++)
         {
