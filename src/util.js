@@ -23,3 +23,15 @@ outer:
     }
     return indexes;
 }
+
+
+export function forEachHalfEdge(face, fn)
+{
+    const first = face.halfEdge;
+    let curr = first;
+    do
+    {
+        fn(curr)
+        curr = curr.next
+    }  while (curr !== first)
+}

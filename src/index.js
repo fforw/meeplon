@@ -5,9 +5,9 @@ import perfNow from "performance-now"
 
 import {
     AmbientLight,
-    BoxGeometry, ConeBufferGeometry,
+    BoxGeometry, BufferGeometry, ConeBufferGeometry,
     DirectionalLight,
-    DirectionalLightHelper,
+    DirectionalLightHelper, LineBasicMaterial, LineSegments,
     Mesh,
     MeshStandardMaterial,
     PCFSoftShadowMap,
@@ -48,8 +48,9 @@ const adjustedZero = new Vector3(0,0,0)
 
 function init()
 {
-    //const seed = 1412
-    const seed = (Math.random() * 4294967296) & 0xffffffff
+    const seed = 1412
+    //const seed = 226970614
+    //const seed = (Math.random() * 4294967296) & 0xffffffff
     const world = new World(seed)
     env.init(world)
 
@@ -91,23 +92,41 @@ function init()
     const patch = new HexagonPatch(0, 0, 30)
     const terrain = new Terrain(scene, world, patch)
 
-    terrain.createGeometries().forEach(
+    const [geoms, lines] = terrain.createGeometries(msTiles)
+
+
+    geoms.forEach(
         (geom) => {
-            console.log("GEOM.TERRAIN", geom.terrain)
+            const geometry = geom.createThreeGeometry()
+            if (geometry)
+            {
+                const material = new MeshStandardMaterial({
+                    roughness: 0.9,
+                    ... geom.terrain.material,
+                    //wireframe: true,
+                    //vertexColors: true
+                })
 
-            const material = new MeshStandardMaterial({
-                roughness: 0.9,
-                ... geom.terrain.material,
-                //wireframe: true,
-                //vertexColors: true
-            })
-
-            const mesh = new Mesh(geom.createThreeGeometry(), material)
-            // mesh.castShadow = true
-            // mesh.receiveShadow = true
-            scene.add(mesh)
+                const mesh = new Mesh(geometry, material)
+                // mesh.castShadow = true
+                // mesh.receiveShadow = true
+                scene.add(mesh)
+            }
         }
     )
+
+    if (lines.length)
+    {
+        const material = new LineBasicMaterial({
+            color: 0x7f000000,
+            depthTest: false
+        });
+
+        const geometry = new BufferGeometry().setFromPoints( lines );
+
+        const line = new LineSegments( geometry, material );
+        scene.add( line );
+    }
 
     const material = new MeshStandardMaterial({
         roughness: 0.9,
@@ -139,7 +158,7 @@ function init()
     window.addEventListener( 'resize', onWindowResize );
 
     postprocessing.bokeh.uniforms[ 'focus' ].value = 100;
-    postprocessing.bokeh.uniforms[ 'aperture' ].value = 0.000025;
+    postprocessing.bokeh.uniforms[ 'aperture' ].value = 0.00005;
     //postprocessing.bokeh.uniforms[ 'maxblur' ].value = 0.015;
     postprocessing.bokeh.uniforms[ 'maxblur' ].value = 0.005;
 }
@@ -235,16 +254,17 @@ function render() {
 
 }
 
-let tiles = {}
+let msTiles = {}
 
 loadModel("media/marching-squares.glb").then(
     gltf => {
 
         gltf.scene.children.forEach( k => {
-            tiles[k.name] = k
+            msTiles[k.name] = k
         })
 
-        console.log("TILES", tiles)
+        console.log("TILE NAMES", Object.keys(msTiles))
+        console.log("TILES", msTiles)
 
         init();
         animate();

@@ -128,6 +128,7 @@ export default class World
 
     getBiome(x,y)
     {
+    
         const ns = 0.000023
         const ns2 = 0.00027
 
@@ -140,13 +141,12 @@ export default class World
 
 
 
-        x = ((x + (n0 + n2) * 128) * 0.008) & 15
-        y = ((y + (n1 + n3) * 128) * 0.008) & 15
+        x = ((x + (n0 + n2) * 128) * 0.008)
+        y = ((y + (n1 + n3) * 128) * 0.008)
 
-        const index = (y << 4) + x
 
         return this.biomeLookup[
-            index
+            (y << 4 + x) & 255
         ]
     }
 

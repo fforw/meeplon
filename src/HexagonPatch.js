@@ -204,6 +204,12 @@ function divideTriIntoQuads(faces, face)
     resetFacesInLoop(hb, fb);
     resetFacesInLoop(hc, fc);
 
+    //fa.halfEdge = fa.halfEdge.next.next
+    //fb.halfEdge = fb.halfEdge.next.next.next
+
+    fa.type = 4
+    fb.type = 5
+    fc.type = 6
 
     faces.push(fa,fb,fc)
 
@@ -263,6 +269,10 @@ function subdivideQuad(faces, face)
 
     faces.push(fa,fb,fc,fd)
 
+    fa.type = 0
+    fb.type = 1
+    fc.type = 2
+    fd.type = 3
 
 }
 

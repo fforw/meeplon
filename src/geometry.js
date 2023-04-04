@@ -27,6 +27,8 @@ export class Vertex
 
     id = 0
 
+    biome = -1
+
     constructor(x, y, z, halfEdge)
     {
         this.x = x;
@@ -83,6 +85,7 @@ export class Face
 
 
     //// TERRAIN DATA //////////////////////////////////////////////////////////////////////////////////////////////////
+    type = -1
 
     /**
      * Terrain index for this face.
@@ -98,8 +101,6 @@ export class Face
      */
     center = null
 
-    biome = -1
-    
     constructor(halfEdge)
     {
         this.halfEdge = halfEdge;
@@ -186,8 +187,6 @@ export class HalfEdge
      * @type {Face}
      */
     face = null;
-
-
 
     constructor(next, vertex, edge, face)
     {
