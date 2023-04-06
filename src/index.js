@@ -1,3 +1,5 @@
+const WIREFRAME = false
+
 import "./style.css"
 import HexagonPatch from "./HexagonPatch"
 import env, { SCALE } from "./env"
@@ -48,8 +50,8 @@ const adjustedZero = new Vector3(0,0,0)
 
 function init()
 {
-    const seed = 1412
-    //const seed = 226970614
+    //const seed = 1412
+    const seed = -202558213
     //const seed = (Math.random() * 4294967296) & 0xffffffff
     const world = new World(seed)
     env.init(world)
@@ -89,7 +91,7 @@ function init()
     helper.position.copy(adjustedZero)
     scene.add( helper );
 
-    const patch = new HexagonPatch(0, 0, 30)
+    const patch = new HexagonPatch(0, 0)
     const terrain = new Terrain(scene, world, patch)
 
     const [geoms, lines] = terrain.createGeometries(msTiles)
@@ -103,7 +105,7 @@ function init()
                 const material = new MeshStandardMaterial({
                     roughness: 0.9,
                     ... geom.terrain.material,
-                    //wireframe: true,
+                    wireframe: WIREFRAME,
                     //vertexColors: true
                 })
 
@@ -256,18 +258,44 @@ function render() {
 
 let msTiles = {}
 
-loadModel("media/marching-squares.glb").then(
-    gltf => {
+Promise.all([
+    loadModel("media/marching-squares.glb")
+])
+.then(
+    ([gltf]) => {
 
         gltf.scene.children.forEach( k => {
             msTiles[k.name] = k
         })
 
-        console.log("TILE NAMES", Object.keys(msTiles))
-        console.log("TILES", msTiles)
+        // console.log("TILE NAMES", Object.keys(msTiles))
+        // console.log("TILES", msTiles)
 
         init();
+
+        console.log("RTREE", env.world.rTree)
+
         animate();
+
+        window.addEventListener("gamepadconnected", (e) => {
+
+            document.getElementById("img-ghostpad").className = "invisible"
+            document.getElementById("img-gamepad").className = ""
+
+            const gp = navigator.getGamepads()[e.gamepad.index];
+
+            console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`)
+
+
+        });
+
+        window.addEventListener("gamepaddisconnected", (e) => {
+
+            document.getElementById("img-ghostpad").className = ""
+            document.getElementById("img-gamepad").className = "invisible"
+
+        });
+
     }
 )
 

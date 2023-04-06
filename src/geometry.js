@@ -73,6 +73,31 @@ export class Edge
 }
 let faceCounter = 0;
 
+let faceGroupCounter = 0
+
+export class FaceGroup
+{
+    /**
+     * Unique group id
+     *
+     * @type {number}
+     */
+    id = ++faceGroupCounter
+
+    /**
+     * Number of faces in the group (3 or 4)
+     *
+     * @type {number}
+     */
+    size = 0
+
+
+    constructor(size)
+    {
+        this.size = size
+    }
+}
+
 
 export class Face
 {
@@ -85,15 +110,16 @@ export class Face
 
 
     //// TERRAIN DATA //////////////////////////////////////////////////////////////////////////////////////////////////
-    type = -1
 
     /**
-     * Terrain index for this face.
-     * 
-     * @type {Number}
+     * Face group this tile belongs to
+     *
+     * @type {FaceGroup}
      */
-    terrain = -1
+    group = null
 
+    aabb = null
+    
     /**
      * Center point of this face which is the x/z centroid at height map height
      *

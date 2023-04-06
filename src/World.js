@@ -1,10 +1,11 @@
 import Prando from "prando"
 import SimplexNoise from "simplex-noise"
-import { TerrainTypes } from "./terrain"
+import { Terrain, TerrainTypes } from "./terrain"
 import { resolve } from "./util"
-import { TAU } from "./env"
+import env, { TAU } from "./env"
+import shuffle from "./shuffle"
 
-
+import RTree from "rtree"
 
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 function hash( x ) {
@@ -18,8 +19,8 @@ function hash( x ) {
 
 
 export const Biomes = TerrainTypes
-    .filter(t => t.name !== "SEA" && t.name !== "ROCK")
-    .map((t,i) => i )
+    .map((t,i) => t.name !== "SEA" && t.name !== "ROCK" ? i : -1 )
+    .filter(n => n >= 0)
 
 
 function createBiomes(prando)
@@ -31,6 +32,67 @@ function createBiomes(prando)
     }
     return biomes
 }
+
+function getRandomValues(prando, count)
+{
+    const out = []
+    for (let i = 0; i < count; i++)
+    {
+        out.push(prando.next())
+    }
+    return out;
+}
+
+export const MAX_HEIGHT = 120
+
+export const MAX_LATITUDE = 10800 // 2 * 10 hex patches in cartesian coordinates (not hex q/r)
+//export const MAX_LONGITUDE = MAX_LATITUDE * 2
+
+
+
+function norm(rnd, array, slices = 4)
+{
+    let sum = 0
+    for (let i = 0; i < array.length; i += 2)
+    {
+        const weight = array[i + 1]
+        sum += weight
+    }
+
+    const factor = 1/(sum * slices);
+
+    const out = []
+    for (let i = 0; i < array.length; i += 2)
+    {
+        const terrain = array[i]
+        let sliceWeight = array[i + 1] * factor
+        for (let j = 0; j < slices; j++)
+        {
+            out.push(
+                [
+                    terrain,
+                    sliceWeight
+                ]
+            )
+        }
+    }
+
+    shuffle(rnd, out)
+
+    sum = 0
+    for (let i = 0; i < out.length; i++)
+    {
+        const e = out[i]
+
+        const weight = e[1]
+        sum += weight
+        e[1] = sum
+    }
+    
+    return out
+}
+
+
 
 
 export default class World
@@ -53,11 +115,21 @@ export default class World
      */
     noise
 
+    /**
+     * RTree for faces
+     *
+     * @type {RTree}
+     */
+    rTree = null
+
     nh = []
     bo = []
 
     biomeLookup = []
     biomeMask = 0
+
+    TROPIC = []
+    MODERATE = []
 
     constructor(seed)
     {
@@ -68,29 +140,26 @@ export default class World
         this.rnd = prando;
 
         // noise offsets x/y for 3 octaves
-        this.nh = [
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next()
-        ]
-
-        this.bo = [
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-            prando.next(),
-        ]
+        this.nh = getRandomValues(prando, 6)
+        this.bo = getRandomValues(prando, 9)
 
         this.biomeMask = prando.nextInt()
         this.biomeLookup = createBiomes(prando)
         this.noise = new SimplexNoise(() => prando.next());
+
+        this.rTree = new RTree()
+
+        this.TROPIC = norm(
+            prando,
+            [Terrain.RAINFOREST, 3, Terrain.RAINFOREST_2,3, Terrain.TALL_GRASS,2, Terrain.GRASS,1, Terrain.MUD,1, Terrain.SAND, 1]
+        )
+        this.MODERATE = norm(
+            prando,
+            [Terrain.DARK_WOODS,4, Terrain.DIRT,1, Terrain.WOODS,4, Terrain.TALL_GRASS,4, Terrain.MUD,1,Terrain.SAND, 1, Terrain.GRASS, 4]
+        )
+
+        console.log("TROPIC", this.TROPIC)
+        console.log("MODERATE", this.MODERATE)
     }
 
 
@@ -109,45 +178,91 @@ export default class World
 
         const [ox0, oy0, ox1, oy1, ox2, oy2 ] = nh
 
-        const ns0 = 0.0001
-        const ns1 = ns0 * 1.97
-        const ns2 = ns1 * 2.13
-
-        const height = 1000
+        const ns0 = 0.003
+        const ns1 = ns0 * 0.13
+        const ns2 = ns0 * -0.17
 
         // three octaves of noise
-        const h = (
-            ((
-               noise.noise3D(ox0 + x * ns0, oy0 + z * ns0, 0) +
-               noise.noise3D(ox1 + x * ns1, oy1 + z * ns1, offset) * 0.5 +
-               noise.noise3D(ox2 + x * ns2, oy2 + z * ns2, offset) * 0.25
-            ) / 1.75) * height
-        )
+        const h = (noise.noise3D(ox0 + x * ns0, oy0 + z * ns0, 0) * 0.7 +
+                   noise.noise3D(ox1 + x * ns1, oy1 + z * ns1, offset) * 0.2 +
+                   noise.noise3D(ox2 + x * ns2, oy2 + z * ns2, offset) * 0.1) * MAX_HEIGHT
         return h
     }
 
-    getBiome(x,y)
+    getBiome(x,y, z)
     {
     
-        const ns = 0.000023
-        const ns2 = 0.00027
+        const tempNs = 0.00007
+        const moistNs = 0.00005
+        const ns2 = 0.0013
 
-        const [ z0,z1,ox0,oy0,ox1,oy1, z2, z3 ] = this.bo
+        const [ tempNx, tempNy, moistNx, moistNy, flavorNx, flavorNy, tempNz, moistNz, flavorNz ] = this.bo
 
-        const n0 = this.noise.noise3D(ox0 + x * ns,oy0 + y * ns, z0)
-        const n1 = this.noise.noise3D(ox1 + x * ns,oy1 + y * ns, z1)
-        const n2 = this.noise.noise3D(ox0 + x * ns2,oy1 + y * ns2, z2)
-        const n3 = this.noise.noise3D(ox1 + x * ns2,oy0 + y * ns2, z3)
+        const tempMalus = Math.min(1,1 - Math.cos(y/MAX_LATITUDE * TAU/4) * 4)
+        const moistureBonus = Math.pow(Math.cos(y/MAX_LATITUDE * TAU/4),2)
 
+        const temperature = Math.max(-1, this.noise.noise3D(tempNx + x * tempNs,tempNy + y * tempNs, tempNz) * 0.8 - tempMalus)
+        const moisture = Math.min(1,this.noise.noise3D(moistNx + x * moistNs,moistNy + y * moistNs, moistNz) + moistureBonus)
+        const flavor = (this.noise.noise3D(flavorNx + x * ns2,flavorNy + y * ns2, flavorNz) * 2 + this.noise.noise3D(flavorNy + y * ns2, flavorNx + x * ns2, flavorNx) * 3)/5
 
+        if (z < 0)
+        {
+            if (z < -10)
+            {
+                return Terrain.DEEP_SEA
+            }
+            return Terrain.SEA
+        }
+        else if (z < 12)
+        {
+            return Terrain.SAND
+        }
 
-        x = ((x + (n0 + n2) * 128) * 0.008)
-        y = ((y + (n1 + n3) * 128) * 0.008)
+        if (temperature < -0.25)
+        {
+            return Terrain.ICE
+        }
 
+        if (moisture < -0.3)
+        {
+            if (temperature < 0.8)
+            {
+                return Terrain.STEPPE
+            }
+            else
+            {
+                return Terrain.SAND
+            }
+        }
 
-        return this.biomeLookup[
-            (y << 4 + x) & 255
-        ]
+        let area
+        if (temperature > 0.7 && moisture > 0.8)
+        {
+            area = this.TROPIC
+        }
+        else
+        {
+            area = this.MODERATE
+        }
+
+        let value = 1 + Math.max(-1.5,
+            Math.min(1.5,
+                flavor + moisture * 0.5
+            )
+        ) / 1.5
+
+        const last = area.length - 1
+        for (let i = 0; i < last; i++)
+        {
+            const [terrain, limit] = area[i]
+
+            if (value < limit)
+            {
+                return terrain
+            }
+            value -= limit
+        }
+        return area[last][0]
     }
 
 }

@@ -1,5 +1,6 @@
-import { Edge, Face, HalfEdge, Vertex } from "./geometry";
+import { Edge, Face, FaceGroup, HalfEdge, Vertex } from "./geometry"
 import env from "./env";
+import shuffle from "./shuffle"
 
 function findInsideEdges(faces)
 {
@@ -53,16 +54,6 @@ function getEdges(faces)
 }
 
 
-function shuffle(a) {
-    let j, x, i;
-    for (i = a.length - 1; i > 0; i--) {
-        j = Math.floor(env.world.rnd.next(0, (i + 1)));
-        x = a[i];
-        a[i] = a[j];
-        a[j] = x;
-    }
-    return a;
-}
 
 
 
@@ -207,9 +198,10 @@ function divideTriIntoQuads(faces, face)
     //fa.halfEdge = fa.halfEdge.next.next
     //fb.halfEdge = fb.halfEdge.next.next.next
 
-    fa.type = 4
-    fb.type = 5
-    fc.type = 6
+    const group = new FaceGroup(3)
+    fa.group = group
+    fb.group = group
+    fc.group = group
 
     faces.push(fa,fb,fc)
 
@@ -269,11 +261,11 @@ function subdivideQuad(faces, face)
 
     faces.push(fa,fb,fc,fd)
 
-    fa.type = 0
-    fb.type = 1
-    fc.type = 2
-    fd.type = 3
-
+    const group = new FaceGroup(4)
+    fa.group = group
+    fb.group = group
+    fc.group = group
+    fd.group = group
 }
 
 
@@ -768,7 +760,7 @@ function key(q, r)
 }
 
 
-export const PATCH_SIZE = 36;
+export const PATCH_SIZE = 24;
 const hSize = PATCH_SIZE/2;
 
 export default class HexagonPatch
@@ -780,7 +772,7 @@ export default class HexagonPatch
 
     hexagons = new Map()
 
-    constructor(q,r, size = 20)
+    constructor(q,r, size = 30)
     {
         this.q = q
         this.r = r
@@ -834,7 +826,7 @@ export default class HexagonPatch
         console.log("Created #" + hexCount + " hexagons")
 
         const edges = [...findInsideEdges(faces)]
-        shuffle(edges)
+        shuffle(env.world.rnd, edges)
 
         const count = 0 | (edges.length * (0.8 + env.world.rnd.next() * 0.15 ))
 
