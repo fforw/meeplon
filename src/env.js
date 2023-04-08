@@ -1,6 +1,8 @@
 export const SCALE = 10
 export const TAU = 2 * Math.PI
 
+let idCounter = 0;
+
 export class Env
 {
     /**
@@ -12,6 +14,11 @@ export class Env
     init(world)
     {
         this.world = world
+    }
+
+    nextId()
+    {
+        return idCounter++
     }
 }
 

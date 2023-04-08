@@ -36,8 +36,9 @@ module.exports = (env,argv) => {
 
                 clean: true,
 
-                library: "Demo",
-                libraryTarget: "var"
+                library: "Game",
+                libraryTarget: "var",
+                libraryExport: "default"
             },
 
 

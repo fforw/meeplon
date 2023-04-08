@@ -1,0 +1,16 @@
+{
+    "Components" : {
+        "Identity" : [ "id"],
+        "Appearance" : [ "x", "y", "z"],
+        "Health" : [ "health" ],
+        "CameraTarget": [],
+        "Controlled": []
+    },
+
+    "Layout" : [
+        {
+            "components": ["Appearance", "Health", "Identity", "CameraTarget", "Controlled"],
+            "size" : 1024
+        }
+    ]
+}

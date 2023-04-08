@@ -1,5 +1,9 @@
-import { calculateNormal } from "./terrain"
 
+const mask = 0
 
-const n = calculateNormal(-908, -162.65233488568626, -706, -923, -159.40933048590247, -714, -923, -159.40933048590247, -714)
-console.log(n)
+let v = 5;
+const before = v;
+const change = 3
+v = v & ~change
+
+console.log(v, (before & change) & mask)

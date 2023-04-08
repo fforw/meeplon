@@ -1,34 +1,39 @@
-const WIREFRAME = false
-
 import "./style.css"
-import HexagonPatch from "./HexagonPatch"
-import env, { SCALE } from "./env"
+import HexagonPatch from "./proc/HexagonPatch"
+import env from "./env"
 import perfNow from "performance-now"
+import $entity from "./util/entity.macro"
 
 import {
     AmbientLight,
-    BoxGeometry, BufferGeometry, ConeBufferGeometry,
     DirectionalLight,
-    DirectionalLightHelper, LineBasicMaterial, LineSegments,
+    DirectionalLightHelper,
     Mesh,
     MeshStandardMaterial,
-    PCFSoftShadowMap,
-    PerspectiveCamera,
-    Scene, Vector3,
+    Quaternion,
+    Scene,
+    Vector3,
     WebGLRenderer
 } from "three"
-
 
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js"
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js"
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js"
-import World from "./World"
-import { Terrain } from "./terrain"
-import loadModel from "./loadModel"
+import World from "./proc/World"
+import { calculateNormalFromHeightMap, Terrain, TerrainTypes } from "./proc/terrain"
+import loadModels from "./util/loadModels"
+import Camera from "./system/Camera"
+import Controller from "./system/Controller"
+import { buttonPressed } from "./util/util"
+
+
+const WIREFRAME = false
+
+const entitySystem = require("./entity/config")
 
 const TAU = Math.PI * 2
 
-let camera, scene, renderer
+let camera, scene, renderer, controller
 
 let mouseX = 0, mouseY = 0, mouseFirst = true;
 let mouseDeltaX = 0, mouseDeltaY = 0;
@@ -41,30 +46,27 @@ let height = window.innerHeight;
 
 const postprocessing = {};
 
-const cameraRadius = 50
+//const cameraTarget = new Vector3(0,0,0)
 
-let cameraHeight = 1
-let cameraAngle = 0
-
-const adjustedZero = new Vector3(0,0,0)
+//const seed = 1412
+//const seed = 1138731272
+const seed = -1174255477
+//const seed = (Math.random() * 4294967296) & 0xffffffff
+const world = new World(seed)
+env.init(world)
 
 function init()
 {
-    //const seed = 1412
-    const seed = -202558213
-    //const seed = (Math.random() * 4294967296) & 0xffffffff
-    const world = new World(seed)
-    env.init(world)
-
-    adjustedZero.setY(world.calculateHeight(0,0) + 5)
-
     const container = document.getElementById("root")
 
-    camera = new PerspectiveCamera( 50, width / height, 1, 30000 );
+    camera = new Camera(width / height)
+
+    controller = new Controller(camera)
 
     scene = new Scene();
 
     renderer = new WebGLRenderer();
+    renderer.physicallyCorrectLights = true
     // renderer.shadowMap.enabled = true;
     // renderer.shadowMap.type = PCFSoftShadowMap; // default THREE.PCFShadowMap
     renderer.setPixelRatio( window.devicePixelRatio );
@@ -74,7 +76,7 @@ function init()
     const ambientLight = new AmbientLight("#4572ff", 0.4)
     scene.add(ambientLight)
 
-    const directionalLight = new DirectionalLight( 0xffffff, 1 );
+    const directionalLight = new DirectionalLight( 0xffffff, 4 );
     // directionalLight.castShadow = true
     //Set up shadow properties for the light
     // directionalLight.shadow.mapSize.width = 512; // default
@@ -82,23 +84,26 @@ function init()
     // directionalLight.shadow.camera.near = 0.5; // default
     // directionalLight.shadow.camera.far = 500; // default
 
-    directionalLight.position.set(0,adjustedZero.y + 20,10);
-    directionalLight.target.position.copy(adjustedZero)
+    const initialTarget = new Vector3(0, Math.max(14, world.calculateHeight(0,0) + 7), 0)
+
+    directionalLight.position.set(0,initialTarget.y + 20,10);
+    directionalLight.target.position.copy(initialTarget)
     directionalLight.target.updateWorldMatrix()
 
     scene.add( directionalLight );
     const helper = new DirectionalLightHelper( directionalLight, 2 );
-    helper.position.copy(adjustedZero)
+    helper.position.copy(initialTarget)
     scene.add( helper );
 
     const patch = new HexagonPatch(0, 0)
     const terrain = new Terrain(scene, world, patch)
 
-    const [geoms, lines] = terrain.createGeometries(msTiles)
+    const [geoms, debug] = terrain.createGeometries(msTiles)
 
 
+    let empties = []
     geoms.forEach(
-        (geom) => {
+        (geom, terrain) => {
             const geometry = geom.createThreeGeometry()
             if (geometry)
             {
@@ -114,33 +119,56 @@ function init()
                 // mesh.receiveShadow = true
                 scene.add(mesh)
             }
+            else
+            {
+                empties.push(TerrainTypes[terrain].name)
+            }
         }
     )
 
-    if (lines.length)
+    if (empties.length)
     {
-        const material = new LineBasicMaterial({
-            color: 0x7f000000,
-            depthTest: false
-        });
-
-        const geometry = new BufferGeometry().setFromPoints( lines );
-
-        const line = new LineSegments( geometry, material );
-        scene.add( line );
+        console.log("No geometry for types " + empties.join(", "))
     }
+
+    debug.addToScene(scene)
+
 
     const material = new MeshStandardMaterial({
         roughness: 0.9,
         color: "#c55"
     })
 
-    const cubeGeo = new ConeBufferGeometry(5,10)
-    const cube = new Mesh(cubeGeo, material)
+    // const cubeGeo = new ConeBufferGeometry(5,10)
+    // const cube = new Mesh(cubeGeo, material)
     // cube.castShadow = true
     // cube.receiveShadow = true
-    cube.position.copy(adjustedZero)
-    scene.add(cube)
+    player.position.copy(initialTarget)
+
+    player.scale.set(5,5,5)
+    scene.add(player)
+
+    playerEntity = entitySystem.newEntity({
+        // Identity
+        id: -1,
+
+        // Appearance
+        x: initialTarget.x,
+        y: initialTarget.y - 7,
+        z: initialTarget.z,
+
+        // Health
+        health: 100
+    })
+
+    entitySystem.addComponent(playerEntity, ["CameraTarget", "Controlled"])
+
+
+    $entity(playerEntity => {
+        console.log({playerEntity, id: playerEntity.id})
+
+    })
+
     //
     // tiles.forEach( t => {
     //
@@ -191,8 +219,7 @@ function onWindowResize() {
     width = window.innerWidth;
     height = window.innerHeight;
 
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
+    camera.updateAspectRatio(width / height)
 
     renderer.setSize( width, height );
     postprocessing.composer.setSize( width, height );
@@ -201,9 +228,9 @@ function onWindowResize() {
 
 function initPostprocessing() {
 
-    const renderPass = new RenderPass( scene, camera );
+    const renderPass = new RenderPass( scene, camera.camera );
 
-    const bokehPass = new BokehPass( scene, camera, {
+    const bokehPass = new BokehPass( scene, camera.camera, {
         focus: 1.0,
         aperture: 0.025,
         maxblur: 0.01
@@ -219,36 +246,108 @@ function initPostprocessing() {
 
 }
 
+
+
+function logGamepadState()
+
+{
+    const { gamepad } = controller
+    if (!gamepad)
+    {
+        return
+    }
+
+
+    const { buttons } = gamepad
+    for (let i = 0; i < buttons.length; i++)
+    {
+        if (buttonPressed(buttons[i]))
+        {
+            console.log("Button #" + i + " pressed" )
+        }
+    }
+
+    //console.log("AXES: " + gamepad.axes.map(axis => axis.toFixed(4)))
+
+}
+
+let playerAngle = 0
+
+const up = new Vector3(0,1,0)
+function wrap(number)
+{
+    const n = number/TAU - (number/TAU | 0);
+    return n < 0 ? TAU + n * TAU : n * TAU;
+}
+
+
 function animate() {
 
-    requestAnimationFrame( animate);
+    logGamepadState()
+
+
+
+    //angle+=0.05
+
+    const sensitivity = 0.00036
+
+    camera.yaw += mouseDeltaX * sensitivity
+    camera.pitch += mouseDeltaY * sensitivity
+
+    controller.update()
+
+    $entity((playerEntity) => {
+
+        const prevX = player.position.x;
+        const prevZ = player.position.z;
+
+        player.position.x = playerEntity.x
+        player.position.y = playerEntity.y + 7
+        player.position.z = playerEntity.z
+
+        const dx = prevX - player.position.x
+        const dz = prevZ - player.position.z
+
+        const a = wrap(-Math.atan2(dz, dx) + TAU/4)
+
+        if (dx * dx + dz * dz > 0.01)
+        {
+            const delta = a - playerAngle
+            playerAngle += 0.1 * delta
+        }
+
+
+    })
+
+
+    const localUp = new Vector3( ... calculateNormalFromHeightMap(world, player.position.x, player.position.z)).multiplyScalar(-1)
+
+    // rotate around the local up axis
+    const q = new Quaternion().setFromAxisAngle(
+        localUp,
+        playerAngle
+    )
+
+    // Rotate the normal y-up so that it points to the local up
+    const q2 =new Quaternion().setFromUnitVectors(
+        up,
+        localUp
+    )
+    player.setRotationFromQuaternion(q.multiply(q2))
+
+    camera.update()
+
+    postprocessing.bokeh.uniforms.focus.value = camera.currentDistance
+
     render();
+    requestAnimationFrame( animate);
 }
+
 
 function render() {
 
     const time = perfNow() * 0.005;
 
-    const sensitivity = 0.00036
-    const sensitivityY = 0.05
-    cameraAngle += mouseDeltaX * sensitivity
-
-    const cameraX = Math.cos(cameraAngle) * cameraRadius
-    const cameraZ = Math.sin(cameraAngle) * cameraRadius
-
-    const camBase = env.world.calculateHeight(cameraX, cameraZ);
-
-    const minY = camBase + 10
-    const maxY = camBase + 250
-
-    cameraHeight -= mouseDeltaY * sensitivityY
-    cameraHeight = cameraHeight < minY ? minY : cameraHeight > maxY ? maxY : cameraHeight
-
-    camera.position.set(cameraX, cameraHeight, cameraZ)
-
-    camera.lookAt( adjustedZero );
-
-    postprocessing.bokeh.uniforms.focus.value = camera.position.clone().sub(adjustedZero).length()
     postprocessing.composer.render( 0.01 );
 
     mouseDeltaX = Math.floor(mouseDeltaX * 90) / 100
@@ -256,20 +355,38 @@ function render() {
 
 }
 
-let msTiles = {}
+let msTiles
+let objects
+let primitives
+let player
+let playerEntity
+
+
+function getGamepadInfo(gp)
+{
+    return `[Gamepad #${gp.index}: ${gp.buttons.length} buttons / ${gp.axes.length} axes]`
+}
+
 
 Promise.all([
-    loadModel("media/marching-squares.glb")
+    loadModels("media/marching-squares.glb"),
+    loadModels("media/objects.glb"),
+    loadModels("media/primitives.glb"),
 ])
 .then(
-    ([gltf]) => {
+    ([glbTiles, glbObjects, glbPrimitives]) => {
 
-        gltf.scene.children.forEach( k => {
-            msTiles[k.name] = k
-        })
+        msTiles = glbTiles
+        objects = glbObjects
+        primitives = glbPrimitives
 
-        // console.log("TILE NAMES", Object.keys(msTiles))
-        // console.log("TILES", msTiles)
+        // console.log("MS TILES", Object.keys(msTiles), "map", msTiles)
+        // console.log("OBJECTS", Object.keys(objects), "map", objects)
+        //console.log("PRIMITIVES", Object.keys(primitives), "map", primitives)
+
+        player = primitives["Triangle"]
+
+        console.log(player)
 
         init();
 
@@ -282,21 +399,26 @@ Promise.all([
             document.getElementById("img-ghostpad").className = "invisible"
             document.getElementById("img-gamepad").className = ""
 
-            const gp = navigator.getGamepads()[e.gamepad.index];
+            controller.gamepad = navigator.getGamepads()[e.gamepad.index];
 
-            console.log(`Gamepad connected at index ${gp.index}: ${gp.id}. It has ${gp.buttons.length} buttons and ${gp.axes.length} axes.`)
-
-
+            console.log(getGamepadInfo(controller.gamepad), "connected")
         });
 
         window.addEventListener("gamepaddisconnected", (e) => {
 
             document.getElementById("img-ghostpad").className = ""
             document.getElementById("img-gamepad").className = "invisible"
+            controller.gamepad = null
+            console.log(getGamepadInfo(navigator.getGamepads()[e.gamepad.index]), "disconnected")
 
         });
+
+
+
 
     }
 )
 
-
+export default {
+    world
+}

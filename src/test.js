@@ -1,8 +1,8 @@
 import domready from "domready"
 import "./style.css"
-import World, { MAX_LATITUDE } from "./World"
-import { TerrainTypes } from "./terrain"
-import Color from "./Color"
+import World, { MAX_LATITUDE } from "./proc/World"
+import { TerrainTypes } from "./proc/terrain"
+import Color from "./util/Color"
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
@@ -37,7 +37,8 @@ domready(
         canvas.width = width;
         canvas.height = height;
 
-        const world = new World(1412)
+        const seed = -1174255477
+        const world = new World(seed)
 
         const paint = () => {
 
@@ -60,7 +61,7 @@ domready(
                     const x0 = x - cx
                     const y0 = y - cy
 
-                   const biome = world.getBiome(x0 * f, y0 * f);
+                   const biome = world.getBiome(x0 * f, y0 * f, Math.max(-10, world.calculateHeight(x0 * f, y0 * f)));
 
                    const color = biome !== undefined ?  Color.from(TerrainTypes[biome].material.color) : pink
                     data[off ] = color.r
@@ -75,6 +76,6 @@ domready(
 
         paint()
 
-        canvas.addEventListener("click", paint, true)
+        //canvas.addEventListener("click", paint, true)
     }
 );
