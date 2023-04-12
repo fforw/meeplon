@@ -1150,6 +1150,14 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
+"@fforw/entity@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@fforw/entity/-/entity-0.0.2.tgz#3c7339ee28ad58510efb1a764c7e2fcea8db9ae1"
+  integrity sha512-K8rwIHptfF6vL+oNU/iBFBRuc/nAXAEwfaX6/ivLdjv0wrPW2/5NjVKwcqjFs0H3FZQR2mXmRX2GlFmvGWr/LA==
+  dependencies:
+    "@babel/types" "^7.21.4"
+    babel-plugin-macros "^3.1.0"
+
 "@jridgewell/gen-mapping@^0.1.0":
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/@jridgewell/gen-mapping/-/gen-mapping-0.1.1.tgz#e5d2e450306a9491e3bd77e323e38d7aff315996"
@@ -3198,6 +3206,11 @@ mocha@^10.2.0:
     yargs "16.2.0"
     yargs-parser "20.2.4"
     yargs-unparser "2.0.0"
+
+morton@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/morton/-/morton-1.0.2.tgz#9cd56bca8830d38c52fed3c1eb6d04d3b86c61f1"
+  integrity sha512-hdvvlXVP9TaKUGQCuA2acKHEXcUiVN3G/vEL1MVoSfKDhCuUfE3pnCWfARUQWNrFySfYhsb6otb8lteKvbc7hA==
 
 ms@2.1.2:
   version "2.1.2"

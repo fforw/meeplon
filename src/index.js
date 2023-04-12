@@ -2,15 +2,16 @@ import "./style.css"
 import HexagonPatch from "./proc/HexagonPatch"
 import env from "./env"
 import perfNow from "performance-now"
-import $entity from "./util/entity.macro"
+import $entity from "@fforw/entity/entity.macro"
+import $log from "./util/log.macro"
 
 import {
-    AmbientLight,
+    AmbientLight, BoxBufferGeometry,
     DirectionalLight,
-    DirectionalLightHelper,
+    DirectionalLightHelper, DoubleSide, InstancedBufferAttribute, InstancedBufferGeometry,
     Mesh,
     MeshStandardMaterial,
-    Quaternion,
+    Quaternion, RawShaderMaterial,
     Scene,
     Vector3,
     WebGLRenderer
@@ -25,11 +26,12 @@ import loadModels from "./util/loadModels"
 import Camera from "./system/Camera"
 import Controller from "./system/Controller"
 import { buttonPressed } from "./util/util"
+import customizeMaterialShader from "./util/customizeMaterialShader"
 
 
 const WIREFRAME = false
 
-const entitySystem = require("./entity/config")
+const sys = require("./entity/config")
 
 const TAU = Math.PI * 2
 
@@ -55,6 +57,24 @@ const seed = -1174255477
 const world = new World(seed)
 env.init(world)
 
+
+function cubes(x = 0, y = 0, z = 0)
+{
+    const size = 10
+    return [
+         size + x,  size + y,  size + z,
+         size + x,  size + y, -size + z,
+        -size + x,  size + y,  size + z,
+        -size + x,  size + y, -size + z,
+         size + x, -size + y,  size + z,
+         size + x, -size + y, -size + z,
+        -size + x, -size + y,  size + z,
+        -size + x, -size + y, -size + z
+
+    ]
+}
+
+
 function init()
 {
     const container = document.getElementById("root")
@@ -73,7 +93,7 @@ function init()
     renderer.setSize( width, height );
     container.appendChild( renderer.domElement );
 
-    const ambientLight = new AmbientLight("#4572ff", 0.4)
+    const ambientLight = new AmbientLight("#4572ff", 1.5)
     scene.add(ambientLight)
 
     const directionalLight = new DirectionalLight( 0xffffff, 4 );
@@ -97,6 +117,8 @@ function init()
 
     const patch = new HexagonPatch(0, 0)
     const terrain = new Terrain(scene, world, patch)
+
+
 
     const [geoms, debug] = terrain.createGeometries(msTiles)
 
@@ -133,6 +155,94 @@ function init()
 
     debug.addToScene(scene)
 
+    const minCode = terrain.faces.map(f => f.code).reduce((a,b) => Math.min(Math.abs(a),Math.abs(b)), Infinity)
+
+    const range = 400
+
+    console.log("MATCHES", terrain.faces.filter( f => Math.abs(f.code - minCode ) < range ))
+
+
+    {
+        const cubeGeo = new InstancedBufferGeometry().copy(new BoxBufferGeometry(10, 10, 10))
+        cubeGeo.instanceCount = 56;
+
+        cubeGeo.setAttribute("cubePos", new InstancedBufferAttribute(new Float32Array([
+            ... cubes(0,0,0),
+            ... cubes(30,0,0),
+            ... cubes(0,30,0),
+            ... cubes(0,0,30),
+            ... cubes(-30,0,0),
+            ... cubes(0,-30,0),
+            ... cubes(0,0,-30),
+        ]), 3, 1));
+
+        const vertexShader = [
+            "precision highp float;",
+            "",
+            "uniform mat4 modelViewMatrix;",
+            "uniform mat4 projectionMatrix;",
+            "",
+            "attribute vec3 position;",
+            "attribute vec3 cubePos;",
+            "",
+            "void main() {",
+            "",
+            "	gl_Position = projectionMatrix * modelViewMatrix * vec4( cubePos + position, 1.0 );",
+            "",
+            "}"
+        ].join("\n")
+        const fragmentShader = [
+            "precision highp float;",
+            "",
+            "void main() {",
+            "",
+            "	gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);",
+            "",
+            "}"
+        ].join("\n")
+
+        // const mat = new RawShaderMaterial({
+        //     uniforms: {},
+        //     vertexShader: vertexShader,
+        //     fragmentShader: fragmentShader,
+        //     side: DoubleSide,
+        //     transparent: false,
+        //     onBeforeCompile( shader, renderer)
+        //     {
+        //         console.log(shader.vertexShader)
+        //     }
+        // })
+
+        const mat = new MeshStandardMaterial(
+            customizeMaterialShader({
+                    roughness: 0.05,
+                    color: "#fff",
+                },
+
+                // language=glsl
+                `
+                    attribute vec3 cubePos;
+                    `,
+
+                // language=glsl
+                `
+                    vec4 mvPosition = vec4( transformed, 1.0 );
+
+                    mvPosition = modelViewMatrix * vec4( cubePos + position, 1.0 );
+
+                    gl_Position = projectionMatrix * mvPosition;`
+            ))
+
+
+        var mesh = new Mesh(cubeGeo, mat);
+
+        mesh.position.set(0,150,0)
+        mesh.frustumCulled = false
+
+
+        scene.add(mesh);
+    }
+
 
     const material = new MeshStandardMaterial({
         roughness: 0.9,
@@ -148,7 +258,7 @@ function init()
     player.scale.set(5,5,5)
     scene.add(player)
 
-    playerEntity = entitySystem.newEntity({
+    playerEntity = sys.newEntity({
         // Identity
         id: -1,
 
@@ -161,7 +271,8 @@ function init()
         health: 100
     })
 
-    entitySystem.addComponent(playerEntity, ["CameraTarget", "Controlled"])
+    sys.addComponent(playerEntity, "CameraTarget")
+    sys.addComponent(playerEntity, "Controlled")
 
 
     $entity(playerEntity => {
@@ -274,11 +385,22 @@ function logGamepadState()
 let playerAngle = 0
 
 const up = new Vector3(0,1,0)
+const front = new Vector3(0,0,1)
 function wrap(number)
 {
     const n = number/TAU - (number/TAU | 0);
     return n < 0 ? TAU + n * TAU : n * TAU;
 }
+
+function getDistance(x0, y0, z0, x1, y1, z1)
+{
+    const dx = x1 - x0
+    const dy = y1 - y0
+    const dz = z1 - z0
+
+    return Math.sqrt(dx * dx + dy * dy + dz * dz)
+}
+
 
 
 function animate() {
@@ -296,44 +418,55 @@ function animate() {
 
     controller.update()
 
+    let speed, dx, dy , dz
+
     $entity((playerEntity) => {
 
         const prevX = player.position.x;
+        const prevY = player.position.y;
         const prevZ = player.position.z;
 
         player.position.x = playerEntity.x
         player.position.y = playerEntity.y + 7
         player.position.z = playerEntity.z
 
-        const dx = prevX - player.position.x
-        const dz = prevZ - player.position.z
+        const { x, y, z} = player.position;
+        
+        dx = x - prevX
+        dy = y - prevY
+        dz = z - prevZ
 
-        const a = wrap(-Math.atan2(dz, dx) + TAU/4)
+        speed = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
-        if (dx * dx + dz * dz > 0.01)
-        {
-            const delta = a - playerAngle
-            playerAngle += 0.1 * delta
-        }
+        const f = 1 / speed
 
+        dx *= f
+        dy *= f
+        dz *= f
 
     })
 
+    const forward = new Vector3(dx, dy, dz)
 
     const localUp = new Vector3( ... calculateNormalFromHeightMap(world, player.position.x, player.position.z)).multiplyScalar(-1)
 
     // rotate around the local up axis
-    const q = new Quaternion().setFromAxisAngle(
-        localUp,
-        playerAngle
-    )
 
-    // Rotate the normal y-up so that it points to the local up
-    const q2 =new Quaternion().setFromUnitVectors(
+    let q2 = new Quaternion().setFromUnitVectors(
         up,
         localUp
     )
-    player.setRotationFromQuaternion(q.multiply(q2))
+
+    player.quaternion.rotateTowards(q2, 0.2)
+    if (speed > 0.5)
+    {
+        const q = new Quaternion().setFromUnitVectors(
+            front.clone().applyQuaternion(q2),
+            forward
+        )
+
+        player.quaternion.rotateTowards(q, 0.3)
+    }
 
     camera.update()
 
@@ -386,12 +519,7 @@ Promise.all([
 
         player = primitives["Triangle"]
 
-        console.log(player)
-
         init();
-
-        console.log("RTREE", env.world.rTree)
-
         animate();
 
         window.addEventListener("gamepadconnected", (e) => {
@@ -413,12 +541,40 @@ Promise.all([
 
         });
 
-
-
-
     }
 )
 
 export default {
     world
 }
+
+/*
+XXX: Interleaved setup
+
+const arraybuffer = new Uint32Array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7]);
+const geometry = new THREE.InstancedBufferGeometry().copy(new THREE.BoxGeometry(1, 1, 1));
+geometry.instanceCount = Infinity;
+const iIB = new THREE.InstancedInterleavedBuffer(arraybuffer, 2, 1); // this part is important
+geometry.setAttribute("attr1", new THREE.InterleavedBufferAttribute(iIB, 1, 0));
+geometry.setAttribute("attr2", new THREE.InterleavedBufferAttribute(iIB, 1, 1));
+
+let material = new THREE.MeshLambertMaterial({
+  color: 0xff0000,
+  //wireframe: true,
+  onBeforeCompile: shader => {
+    shader.vertexShader = `
+      attribute uint attr1;
+      attribute uint attr2;
+      ${shader.vertexShader}
+    `.replace(
+      `#include <begin_vertex>`,
+      `#include <begin_vertex>
+        transformed.xy += vec2(attr1, attr2); // check, that it's working
+      `
+    );
+    console.log(shader.vertexShader)
+  }
+});
+
+
+ */

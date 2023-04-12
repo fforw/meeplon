@@ -8,7 +8,7 @@ module.exports = createMacro(entityMacro, {
     configName: "entityMacro"
 })
 
-function getConfig(entitySystem, ref)
+function getConfig(sys, ref)
 {
     const entities = ref.parentPath.node.arguments[0].params.map(p => p.name)
     const props = new Map()
@@ -27,7 +27,7 @@ function getConfig(entitySystem, ref)
                     throw new MacroError("Only Identifier props allowed for entities.")
                 }
 
-                const cfg = entitySystem.getPropConfig(property.name, MacroError)
+                const cfg = sys.getPropConfig(property.name, MacroError)
                 props.set(
                     property.name,
                     cfg
@@ -52,12 +52,12 @@ function entityMacro({references,config, state}) {
     );
 
     const raw = JSON.parse(json)
-    const entitySystem = new EntitySystem(raw)
+    const sys = new EntitySystem(raw)
 
     references.default.forEach(ref => {
         const { body } = ref.parentPath.node.arguments[0]
 
-        const {props, usedArrays, entities} = getConfig(entitySystem, ref)
+        const {props, usedArrays, entities} = getConfig(sys, ref)
 
         const arrayNames = {}
         for (let array of usedArrays)
@@ -116,7 +116,7 @@ function entityMacro({references,config, state}) {
                         t.identifier(arrayNames[array]),
                         t.memberExpression(
                             t.memberExpression(
-                                t.identifier("entitySystem"),
+                                t.identifier("sys"),
                                 t.identifier("arrays"),
                                 false
                             ),

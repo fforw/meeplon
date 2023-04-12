@@ -54,8 +54,9 @@ export function calculateNormal(x0, y0, z0, x1, y1, z1, x2, y2, z2)
 
 function initCenterAndAABB(world,face)
 {
+    // XXX: for more than one patch, insert world pos for patch (q/r)
     const patchX = 0
-    const patchY = 0
+    const patchZ = 0
 
     const first = face.halfEdge;
     let curr = first;
@@ -69,7 +70,7 @@ function initCenterAndAABB(world,face)
         const next = curr.next;
 
         const x0 = 0|patchX + curr.vertex.x
-        const z0 = 0|patchY + curr.vertex.y
+        const z0 = 0|patchZ + curr.vertex.y
 
         x += x0;
         z += z0;
@@ -94,8 +95,10 @@ function initCenterAndAABB(world,face)
 }
 
 function getArea(face) {
+
+    // XXX: for more than one patch, insert world pos for patch (q/r)
     const patchX = 0
-    const patchY = 0
+    const patchZ = 0
 
     const first = face.halfEdge;
     let curr = first;
@@ -106,9 +109,9 @@ function getArea(face) {
         const next = curr.next;
 
         const x0 = 0|patchX + curr.vertex.x
-        const z0 = 0|patchY + curr.vertex.y
+        const z0 = 0|patchZ + curr.vertex.y
         const x1 = 0|patchX + next.vertex.x
-        const z1 = 0|patchY + next.vertex.y
+        const z1 = 0|patchZ + next.vertex.y
 
         area += z1 * x0 - x1 * z0;
 
@@ -267,7 +270,6 @@ function getStats(diffs)
         median = (diffs[half].diff + diffs[half + 1].diff)/2
     }
 
-    console.log("DIFFS", diffs)
     console.log("Median Height difference", median)
     console.log("Average Height difference", diffs.reduce((a,b) => a + b.diff, 0) / diffs.length)
 
@@ -345,20 +347,20 @@ export class Terrain {
     {
         const MARK_FACES = false
 
-        const patchX = 0
-        const patchY = 0
-
         const { world } = this
 
         const geoms = TerrainTypes.map( tt => new GeomPerMat(world,tt))
 
         const faces = this.faces
 
+        console.log("Creating geometry for ", faces.length, " faces")
+
         const debug = new DebugLines();
 
         for (let i = 0; i < faces.length; i++)
         {
             const face = faces[i]
+
             const first = face.halfEdge
             const { biome: biome0 } = first.vertex
             const { biome: biome1 } = first.next.vertex
@@ -435,7 +437,7 @@ export class Terrain {
         }
 
         let diff = getEdgesByHeightDifference(faces)
-        getStats(diff)
+        //getStats(diff)
 
         // diff.filter(e => e.diff > 15).forEach(
         //     ({edge}) => {

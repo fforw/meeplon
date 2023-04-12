@@ -119,6 +119,8 @@ export class Face
     group = null
 
     aabb = null
+
+    code = 0
     
     /**
      * Center point of this face which is the x/z centroid at height map height

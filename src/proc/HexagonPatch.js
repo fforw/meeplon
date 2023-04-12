@@ -2,6 +2,7 @@ import { Edge, Face, FaceGroup, HalfEdge, Vertex } from "./geometry"
 import env from "../env";
 import shuffle from "../util/shuffle"
 import getDistance from "../util/getDistance"
+import morton from "morton"
 
 function findInsideEdges(faces)
 {
@@ -171,6 +172,9 @@ function divideTriIntoQuads(faces, face)
     const fb = new Face(null);
     const fc = new Face(null);
 
+    fa.code = face.code
+    fb.code = face.code + 1
+    fc.code = face.code + 2
 
     const hvca = new HalfEdge(hca, vertex, new Edge(null), fa);
     const hvab = new HalfEdge(hab, vertex, new Edge(null), fb);
@@ -234,6 +238,10 @@ function subdivideQuad(faces, face)
     const fc = new Face(null);
     const fd = new Face(null);
 
+    fa.code = face.code
+    fb.code = face.code + 1
+    fc.code = face.code + 2
+    fd.code = face.code + 3
 
     const hvab = new HalfEdge(hab, vertex, new Edge(null), fb);
     const hvbc = new HalfEdge(hbc, vertex, new Edge(null), fc);
@@ -643,6 +651,18 @@ const directions = [
     new Vertex(-sin60,  -0.5, 0, null),
 ]
 
+const qrOffsets = [
+        [0,0],
+        [0,0],
+    new Vertex(0,0, null),
+    new Vertex(0,-1, null),
+    new Vertex(sin60, -0.5, 0, null),
+    new Vertex(sin60,  0.5, 0, null),
+    new Vertex(0,1, null),
+    new Vertex(-sin60, 0.5, 0, null),
+    new Vertex(-sin60,  -0.5, 0, null),
+]
+
 const evenNeighbors = [
     [0,-1],
     [1,0],
@@ -675,6 +695,8 @@ export function createHexagon(q, r, faces, points, patch)
     const offX = w * q + ((r & 1) !== 0 ? hw : 0)
     const offY = h * 0.75 * r
 
+    const hexCode = key(q,r) << 5
+
 
     const verts = directions.map(d => new Vertex(
         d.x * patch.size + offX,
@@ -694,6 +716,9 @@ export function createHexagon(q, r, faces, points, patch)
         const v2 = verts[i === last ? 1 : i + 1];
 
         const face = new Face(null);
+
+        // base code for non-subdivided first-phase faces
+        face.code = hexCode + (i << 2)
 
         if (i === 1)
         {
@@ -755,7 +780,7 @@ export function createHexagon(q, r, faces, points, patch)
 
 function key(q, r)
 {
-    return q + "/" + r
+    return morton(q,r)
 }
 
 

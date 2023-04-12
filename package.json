@@ -5,7 +5,9 @@
     "author": "Sven Helmberger",
     "license": "Apache-2.0",
     "dependencies": {
+        "@fforw/entity": "^0.0.2",
         "domready": "^1.0.8",
+        "morton": "^1.0.2",
         "performance-now": "^2.1.0",
         "prando": "^6.0.1",
         "rtree": "^1.4.2",

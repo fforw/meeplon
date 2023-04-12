@@ -1,11 +1,11 @@
 import { PerspectiveCamera } from "three"
-import $entity from "../util/entity.macro"
+import $entity from "@fforw/entity/entity.macro"
 import env, { TAU } from "../env"
 import getDistance from "../util/getDistance"
-import { easeInOutCubic } from "../util/easing"
-const entitySystem = require("../entity/config")
+import { easeInCubic, easeInOutCubic, easeOutCubic } from "../util/easing"
+const sys = require("../entity/config")
 
-const cameraTargetMask = entitySystem.mask(["Appearance", "CameraTarget"])
+const cameraTargetMask = sys.mask(["Appearance", "CameraTarget"])
 
 function limit(v,min,max)
 {
@@ -31,7 +31,7 @@ export default class Camera
     {
         this.camera = new PerspectiveCamera( 50, aspect, 1, 30000 );
 
-        entitySystem.onEnter(cameraTargetMask, entity => {
+        sys.onEnter(cameraTargetMask, entity => {
             return this.targetEntity = entity
         })
     }
@@ -51,13 +51,13 @@ export default class Camera
             this.currentDistance = getDistance(targetX, targetY, targetZ, x, y, z)
 
             const minPitch = -TAU * 0.01
-            const maxPitch =  TAU/4
+            const maxPitch =  TAU * 0.4
 
             this.pitch = limit(this.pitch, minPitch, maxPitch)
 
             //console.log("YAW", this.yaw, "PITCH", this.pitch)
 
-            const d = distance * (0.45 + 0.55 * easeInOutCubic(Math.pow(((this.pitch - minPitch) / (maxPitch - minPitch)),2)))
+            const d = distance * (0.45 + 0.55 * easeOutCubic(Math.pow(((this.pitch - minPitch) / (maxPitch - minPitch)),2)))
 
             const cameraX = targetX + Math.cos(this.yaw) * d
             const cameraZ = targetZ + Math.sin(this.yaw) * d

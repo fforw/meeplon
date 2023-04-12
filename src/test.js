@@ -3,6 +3,7 @@ import "./style.css"
 import World, { MAX_LATITUDE } from "./proc/World"
 import { TerrainTypes } from "./proc/terrain"
 import Color from "./util/Color"
+import perfNow from "performance-now"
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
@@ -20,6 +21,9 @@ let ctx;
 let canvas;
 
 const pink = Color.from("#f0f")
+
+const range = 10000
+
 
 domready(
     () => {
@@ -41,6 +45,8 @@ domready(
         const world = new World(seed)
 
         const paint = () => {
+
+            const start = perfNow()
 
             ctx.fillStyle = "#000";
             ctx.fillRect(0,0, width, height);
@@ -72,6 +78,11 @@ domready(
             }
 
             ctx.putImageData(imageData,0 ,0)
+
+            const end = perfNow()
+
+            console.log("Time:" + (Math.round(end-start/100)/1000) + "s")
+
         }
 
         paint()

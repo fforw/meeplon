@@ -1,11 +1,11 @@
-import entitySystem from "../entity/config"
+import sys from "../entity/config"
 
-import $entity from "../util/entity.macro"
+import $entity from "@fforw/entity/entity.macro"
 import env from "../env"
 import { buttonPressed } from "../util/util"
 
 
-const controllerMask = entitySystem.mask(["Appearance", "Controlled"])
+const controllerMask = sys.mask(["Appearance", "Controlled"])
 export default class Controller
 {
     controlledEntity = -1
@@ -16,7 +16,7 @@ export default class Controller
     {
         this.camera = camera
 
-        entitySystem.onEnter(controllerMask, entity => {
+        sys.onEnter(controllerMask, entity => {
             console.log("Set controlled to", entity)
             return this.controlledEntity = entity
         })
@@ -31,7 +31,7 @@ export default class Controller
 
             $entity(controlledEntity => {
 
-                const sensitivity = buttonPressed(gamepad.buttons[7]) ? 1.5 : 0.5
+                const sensitivity = buttonPressed(gamepad.buttons[7]) ? 3 : 0.5
                 const xAxis = gamepad.axes[0].toFixed(4)
                 const yAxis = gamepad.axes[1].toFixed(4)
 

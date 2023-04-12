@@ -1,5 +1,7 @@
 {
     "entityMacro": {
-        "config": "test/test-macro-config.json"
+        "entitySystemName": "sys",
+        "config": "test/list-config.json",
+        "debug" : true
     }
 }

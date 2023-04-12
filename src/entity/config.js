@@ -1,16 +1,18 @@
-const EntitySystem = require("./EntitySystem")
+const EntitySystem = require("@fforw/entity")
 const config = require("../../entity-config.json")
-const $entity = require("../util/entity.macro")
+const $entity = require("@fforw/entity/entity.macro")
 
-const entitySystem = new EntitySystem(config)
+const sys = new EntitySystem(config)
 
 let idCounter = 0
-$entity(identified => {
-    entitySystem.onEnter(
-        entitySystem.mask("Identity"),
+    sys.onEnter(
+        sys.mask("Identity"),
         identified => {
-            identified.id = idCounter++
+            $entity(identified => {
+                identified.id = idCounter++
+            })
         })
-})
 
-module.exports = entitySystem
+//console.log("ENTITY SYSTEM", sys)
+
+module.exports = sys

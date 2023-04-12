@@ -4,12 +4,19 @@
         "Appearance" : [ "x", "y", "z"],
         "Health" : [ "health" ],
         "CameraTarget": [],
-        "Controlled": []
+        "Controlled": [],
+        "T1": [],
+        "T2": [],
+        "T3": []
     },
 
     "Layout" : [
         {
-            "components": ["Appearance", "Health", "Identity", "CameraTarget", "Controlled"],
+            "components": ["Appearance", "Health", "Identity","CameraTarget", "Controlled"],
+            "size" : 1024
+        },
+        {
+            "components": ["T1","T2","T3"],
             "size" : 1024
         }
     ]

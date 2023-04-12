@@ -1,0 +1,15 @@
+{
+    "Components": {
+        "Appearance": ["x", "y", "z"],
+        "Health": ["health"],
+        "EntityList" : [""],
+        "EntityListItem" : ["entityListRef", "valueEntity"]
+    },
+    "Layout" : [
+        {
+            "components": ["Appearance", "Health","EntityList", "EntityListItem"],
+            "size": 100
+        }
+    ],
+    "entityCount": 100
+}
